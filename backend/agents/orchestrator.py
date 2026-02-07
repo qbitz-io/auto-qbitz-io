@@ -1,0 +1,182 @@
+"""Orchestrator agent - the core agent responsible for planning and coordination."""
+from typing import List, Dict, Any, AsyncIterator
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, AIMessage
+from ..core import get_llm, state_manager, BuildStep, SystemCapability
+from ..tools import BASE_TOOLS
+from .self_improver import self_improver
+import uuid
+
+
+ORCHESTRATOR_PROMPT = """You are the Orchestrator agent for a self-building LangChain system.
+
+Your responsibilities:
+1. Analyze the current system state and identify missing or broken components
+2. Plan build steps to implement missing capabilities
+3. Coordinate specialized agents (Planner, Builder, Validator, Toolsmith)
+4. Track progress and ensure system coherence
+5. Decide when the system is complete (no more deltas)
+
+Current system state:
+- Project root: {project_root}
+- Backend root: {backend_root}
+- Generated files: {generated_files}
+- Capabilities: {capabilities}
+
+You have access to tools for:
+- Reading and writing files
+- Listing directories
+- Validating Python syntax
+- Running commands
+- Checking system state
+
+When analyzing the system:
+1. Check what files exist
+2. Compare against required architecture
+3. Identify gaps (missing agents, tools, or infrastructure)
+4. Generate or update code to fill gaps
+5. Validate changes
+
+Required system architecture:
+- backend/agents/: PlannerAgent, BuilderAgent, ValidatorAgent, ToolsmithAgent
+- backend/tools/: base_tools.py and any dynamically generated tools
+- backend/core/: config.py, state.py, llm.py
+- backend/memory/: persistent state storage
+- backend/main.py: entry point
+- backend/api.py: FastAPI server
+- frontend/: Next.js UI
+
+Work systematically. Generate complete, executable code. No placeholders or TODOs.
+"""
+
+
+class OrchestratorAgent:
+    """The core orchestrator agent that manages the self-building process."""
+    
+    def __init__(self):
+        self.llm = get_llm()
+        self.tools = BASE_TOOLS
+        self.agent_executor = None
+        self._initialize_agent()
+    
+    def _initialize_agent(self):
+        """Initialize the LangChain agent with tools."""
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", ORCHESTRATOR_PROMPT),
+            MessagesPlaceholder(variable_name="chat_history", optional=True),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ])
+        
+        agent = create_tool_calling_agent(self.llm, self.tools, prompt)
+        self.agent_executor = AgentExecutor(
+            agent=agent,
+            tools=self.tools,
+            verbose=True,
+            max_iterations=20,
+            handle_parsing_errors=True
+        )
+    
+    async def run(self, task: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Run the orchestrator with a specific task.
+        
+        Args:
+            task: The task description
+            context: Additional context for the agent
+        
+        Returns:
+            Agent execution result
+        """
+        # Get current state
+        state = await state_manager.get_state()
+        
+        # Prepare context
+        from ..core import settings
+        full_context = {
+            "project_root": str(settings.project_root),
+            "backend_root": str(settings.backend_root),
+            "generated_files": state.generated_files,
+            "capabilities": [cap.model_dump() for cap in state.capabilities],
+        }
+        
+        if context:
+            full_context.update(context)
+        
+        # Create build step
+        step_id = str(uuid.uuid4())
+        step = BuildStep(
+            id=step_id,
+            agent="orchestrator",
+            action=task,
+            status="running"
+        )
+        await state_manager.add_build_step(step)
+        
+        try:
+            # Run agent
+            result = await self.agent_executor.ainvoke({
+                "input": task,
+                **full_context
+            })
+            
+            # Update step
+            await state_manager.update_build_step(
+                step_id,
+                status="completed",
+                result=str(result.get("output", ""))
+            )
+            
+            # After main run, invoke self-improver for syncing docs and improvements
+            await self_improver.improve("Sync documentation with new capabilities and improvements.")
+            
+            return result
+        
+        except Exception as e:
+            # Update step with error
+            await state_manager.update_build_step(
+                step_id,
+                status="failed",
+                error=str(e)
+            )
+            raise
+    
+    async def analyze_system(self) -> Dict[str, Any]:
+        """Analyze current system state and identify gaps.
+        
+        Returns:
+            Analysis results with identified gaps
+        """
+        return await self.run(
+            "Analyze the current system state. List all files in backend/ and frontend/. "
+            "Identify which required components are missing or incomplete. "
+            "Return a structured analysis of what needs to be built."
+        )
+    
+    async def build_missing_components(self) -> Dict[str, Any]:
+        """Build or update missing system components.
+        
+        Returns:
+            Build results
+        """
+        return await self.run(
+            "Based on the required architecture, generate any missing files. "
+            "Start with the most critical components: agents, then API, then main entry point. "
+            "Write complete, executable code for each file."
+        )
+    
+    async def validate_system(self) -> Dict[str, Any]:
+        """Validate the current system state.
+        
+        Returns:
+            Validation results
+        """
+        return await self.run(
+            "Validate all Python files in the backend. "
+            "Check syntax and ensure imports are correct. "
+            "Report any issues found."
+        )
+
+
+# Global orchestrator instance
+orchestrator = OrchestratorAgent()
