@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd File Guardian: human-in-the-loop protection for core files\n\nPrevents Auto from modifying its own core architecture without human\napproval. After Auto lobotomized itself by replacing the orchestrator\nand API with stubs, this adds a guardian layer to write_file that\nqueues changes to 17 protected files for human review via API.\n\n- New: backend/core/file_guardian.py \\(protection logic + approval queue\\)\n- Modified: write_file tool checks guardian before any write\n- New API endpoints: /api/approvals \\(list/review/approve/deny changes\\)\n- Forbidden paths \\(.env, .git\\) are always blocked\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(curl:*)"
+    ]
+  }
+}
