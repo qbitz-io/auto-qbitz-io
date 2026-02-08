@@ -85,13 +85,21 @@ Auto will decompose your goals into executable steps, build or update code, vali
 
 ## Guardian System and Approval Workflow
 
-Auto includes a Guardian system that oversees critical modifications to core files and sensitive operations. When a change requires approval:
+Auto includes a **FileGuardian** that protects core system files from accidental modification:
 
-- The system will prompt you via the chat interface.
-- You can review the proposed changes in detail.
-- Approve or reject the changes to control the system's evolution.
+**Protected files include:**
+- All agent files (orchestrator, planner, builder, validator, toolsmith)
+- Core tools and API endpoints
+- Key frontend components
+- Configuration files
 
-This workflow ensures safety and human oversight over the autonomous development process.
+When Auto attempts to modify a protected file:
+1. The change is queued for approval
+2. You review it in the Approvals panel
+3. You can approve or deny the change
+4. Only approved changes are applied
+
+This ensures Auto cannot break itself without human oversight.
 
 ---
 
@@ -132,11 +140,25 @@ Auto's architecture consists of:
 
 ## Contributing
 
-This repository contains the locked core of Auto. It is designed to be a stable foundation for others to fork and specialize. 
+## 🔒 Repository Status: LOCKED CORE
 
-If you want to extend or customize Auto for your own projects, please fork this repository and build on top of it.
+**Version:** 1.0.0 (Stable Foundation)
 
-For core improvements or bug fixes, please submit pull requests with detailed explanations.
+This repository contains the **minimal, stable core** of Auto. 
+
+### For Users
+Fork this repo and build your specialized Auto on top of it.
+
+### For Contributors  
+We are **not accepting pull requests** to modify the core. To contribute:
+1. Build your enhancement as a fork
+2. Share your fork publicly  
+3. Document your additions
+
+The core stays minimal by design.
+
+### Critical Bugs Only
+Security issues or critical bugs: open an issue and we'll evaluate.
 
 ---
 
