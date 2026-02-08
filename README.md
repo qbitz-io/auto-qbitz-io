@@ -1,10 +1,31 @@
-# Auto v1.0
+# Auto v1.0.0 - Stable Foundation
 
 ## What is Auto?
+A self-building AI system that autonomously plans, builds, validates, and improves software through conversational interaction.
 
-Auto is a foundational, self-building AI system designed to autonomously plan, build, validate, and improve software projects using a suite of specialized agents. It leverages advanced language models to orchestrate complex development workflows, enabling users to iteratively build and enhance features through a conversational chat interface.
+## Core Features
+✅ Self-building agent pipeline  
+✅ Chat-based interface  
+✅ FileGuardian protection system  
+✅ Human-in-the-loop approvals  
+✅ ResearchAgent for live documentation  
 
-Auto is not a finished product but a robust base system intended for developers and researchers to fork, customize, and extend according to their unique needs.
+> **🔒 Repository Status: LOCKED CORE v1.0.0**  
+> This is the stable foundation. **No PRs accepted.** Fork to extend.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/solight111/CompassAGI-Auto/releases)
+[![Forks](https://img.shields.io/github/forks/solight111/CompassAGI-Auto.svg)](https://github.com/solight111/CompassAGI-Auto/network)
+
+---
+
+**To extend Auto:** Fork this repository and build your specialized version.
+
+## Getting Started
+See the [README](https://github.com/solight111/CompassAGI-Auto/blob/master/README.md) for setup instructions.
+
+## License
+MIT License - See LICENSE file for details.
 
 ---
 
