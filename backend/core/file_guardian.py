@@ -42,6 +42,7 @@ PROTECTED_PATHS = [
     "frontend/components/CapabilitiesPanel.tsx",
     "frontend/components/BuildStepsPanel.tsx",
     "frontend/components/ControlPanel.tsx",
+    "frontend/components/ApprovalsPanel.tsx",
 ]
 
 # Paths that are always blocked, even with approval

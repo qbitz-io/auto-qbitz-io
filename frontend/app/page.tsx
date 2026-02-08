@@ -6,6 +6,7 @@ import { CapabilitiesPanel } from "@/components/CapabilitiesPanel";
 import { BuildStepsPanel } from "@/components/BuildStepsPanel";
 import { ControlPanel } from "@/components/ControlPanel";
 import { ChatInterface } from "@/components/ChatInterface";
+import { ApprovalsPanel } from "@/components/ApprovalsPanel";
 
 export default function Home() {
   const [status, setStatus] = useState<any>(null);
@@ -141,9 +142,13 @@ export default function Home() {
           <ChatInterface />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <CapabilitiesPanel capabilities={capabilities} />
           <BuildStepsPanel buildSteps={buildSteps} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6">
+          <ApprovalsPanel />
         </div>
       </div>
     </main>
