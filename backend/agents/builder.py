@@ -9,7 +9,7 @@ import uuid
 
 BUILDER_PROMPT = """You are the Builder agent for a self-building LangChain system.
 
-Your responsibility is to write and update code files (Python, JavaScript, TypeScript).
+Your responsibility is to write and update code files (Python, JavaScript, TypeScript, JSX).
 
 When given a build task:
 1. Understand the requirements and context
@@ -33,7 +33,7 @@ For Python:
 - Add docstrings
 - Use async/await for I/O operations
 
-For JavaScript/TypeScript:
+For JavaScript/TypeScript/JSX:
 - Use TypeScript when possible
 - Follow modern ES6+ syntax
 - Proper component structure for React
@@ -48,6 +48,16 @@ You have tools to:
 Current project structure: {project_root}
 Generated files: {generated_files}
 """
+
+
+# Mapping from language to file extension and target directory
+LANGUAGE_FILE_MAP = {
+    "python": {"ext": ".py", "dir": "backend/agents"},
+    "javascript": {"ext": ".js", "dir": "frontend/components"},
+    "typescript": {"ext": ".ts", "dir": "frontend/components"},
+    "jsx": {"ext": ".tsx", "dir": "frontend/components"},
+    "tsx": {"ext": ".tsx", "dir": "frontend/components"},
+}
 
 
 class BuilderAgent:
@@ -77,12 +87,33 @@ class BuilderAgent:
             handle_parsing_errors=True
         )
     
+    def _route_file(self, language: str, filename: str) -> str:
+        """Determine the correct file path based on language and filename.
+
+        Args:
+            language: Programming language or file type
+            filename: Base filename without extension
+
+        Returns:
+            Full relative file path with correct extension and directory
+        """
+        mapping = LANGUAGE_FILE_MAP.get(language.lower())
+        if mapping:
+            ext = mapping["ext"]
+            directory = mapping["dir"]
+        else:
+            # Default to python if unknown
+            ext = ".py"
+            directory = "backend/agents"
+        
+        return f"{directory}/{filename}{ext}"
+
     async def build(self, task: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
         """Execute a build task.
         
         Args:
             task: Description of what to build
-            context: Additional context (file paths, requirements, etc.)
+            context: Additional context (file paths, requirements, language, filename, etc.)
         
         Returns:
             Build result
@@ -99,6 +130,11 @@ class BuilderAgent:
         
         if context:
             full_context.update(context)
+        
+        # Determine file path if language and filename provided
+        if context and "language" in context and "filename" in context:
+            file_path = self._route_file(context["language"], context["filename"])
+            full_context["file_path"] = file_path
         
         # Create build step
         step_id = str(uuid.uuid4())

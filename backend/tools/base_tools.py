@@ -8,6 +8,13 @@ from langchain_core.tools import tool
 from ..core import settings, state_manager
 from ..core.file_guardian import file_guardian
 
+# Windows reserved filenames (case insensitive)
+WINDOWS_RESERVED_NAMES = {
+    "nul", "con", "prn", "aux",
+    *(f"com{i}" for i in range(1, 10)),
+    *(f"lpt{i}" for i in range(1, 10)),
+}
+
 
 @tool
 async def read_file(file_path: str) -> str:
@@ -41,6 +48,13 @@ async def write_file(file_path: str, content: str) -> str:
     Returns:
         Success or error message
     """
+    # Normalize filename for reserved name check
+    filename = Path(file_path).name.lower()
+
+    # Check Windows reserved filenames
+    if filename in WINDOWS_RESERVED_NAMES:
+        return f"BLOCKED: '{filename}' is a Windows reserved filename and cannot be used."
+
     # GUARDIAN CHECK: Block forbidden files entirely
     if file_guardian.is_forbidden(file_path):
         return f"BLOCKED: '{file_path}' is a forbidden path and cannot be written to."
@@ -58,6 +72,13 @@ async def write_file(file_path: str, content: str) -> str:
             f"A human must approve this change at /api/approvals/{approval.id}/approve before it takes effect. "
             f"Do NOT attempt to bypass this protection."
         )
+
+    # Pre-write syntax validation for Python files
+    if file_path.endswith('.py'):
+        try:
+            ast.parse(content)
+        except SyntaxError as e:
+            return f"SYNTAX ERROR: {str(e)}"
 
     # Non-protected file: write normally
     full_path = settings.project_root / file_path
