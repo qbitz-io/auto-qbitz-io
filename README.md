@@ -1,4 +1,4 @@
-# Auto v1.0.0 - Stable Foundation
+# Auto v1.0.3 - Stable
 
 ## What is Auto?
 A self-building AI system that autonomously plans, builds, validates, and improves software through conversational interaction.
