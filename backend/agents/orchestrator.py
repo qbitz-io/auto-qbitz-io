@@ -1,14 +1,16 @@
 """Orchestrator agent - the core agent responsible for planning and coordination."""
-from typing import List, Dict, Any, AsyncIterator
+from typing import List, Dict, Any, AsyncIterator, Optional
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 from ..core import get_llm, state_manager, BuildStep, SystemCapability
 from ..tools import BASE_TOOLS
-from .self_improver import self_improver
 from .researcher import ResearchAgent
+from .planner import PlannerAgent, planner
 import uuid
 import re
+import hashlib
+import asyncio
 
 
 ORCHESTRATOR_PROMPT = """You are the Orchestrator agent for a self-building LangChain system.
@@ -61,7 +63,10 @@ class OrchestratorAgent:
         self.tools = BASE_TOOLS
         self.agent_executor = None
         self.research_agent = ResearchAgent()
+        self.planner_agent = planner
         self._initialize_agent()
+        self._task_cache_limit = 100
+        self._task_cache = []  # LRU cache of task hashes
     
     def _initialize_agent(self):
         """Initialize the LangChain agent with tools."""
@@ -110,19 +115,59 @@ class OrchestratorAgent:
             results[api] = snippets
         return results
 
-    async def run(self, task: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    def _is_complex_prompt(self, prompt: str) -> bool:
+        """Detect if the prompt is complex based on criteria:
+        - 100+ words
+        - Mentions multiple subsystems
+        - Contains phrases like 'build a complete system'
+        """
+        word_count = len(prompt.split())
+        if word_count >= 100:
+            return True
+        subsystems = ["agents", "tools", "core", "frontend", "backend", "api", "main entry point"]
+        subsystems_mentioned = sum(1 for s in subsystems if s in prompt.lower())
+        if subsystems_mentioned >= 2:
+            return True
+        if re.search(r"build a complete system", prompt.lower()):
+            return True
+        return False
+
+    async def run(self, task: str, context: Optional[Dict[str, Any]] = None, depth: int = 0) -> Dict[str, Any]:
         """Run the orchestrator with a specific task.
-        
+
         Args:
             task: The task description
             context: Additional context for the agent
-        
+            depth: Recursion depth counter to prevent infinite recursion
+
         Returns:
             Agent execution result
         """
+        # Limit recursion depth to 2
+        if depth > 2:
+            return {"output": "Max recursion depth reached, stopping further decomposition."}
+
+        # Hash the task prompt
+        task_hash = hashlib.sha256(task.encode('utf-8')).hexdigest()
+
+        # Check LRU cache to prevent unbounded memory growth
+        if task_hash in self._task_cache:
+            # Move to end to mark as recently used
+            self._task_cache.remove(task_hash)
+            self._task_cache.append(task_hash)
+            cached_result = await state_manager.get_cached_result(task_hash)
+            if cached_result is not None:
+                return {"output": cached_result, "cached": True}
+        else:
+            # Add to cache
+            self._task_cache.append(task_hash)
+            if len(self._task_cache) > self._task_cache_limit:
+                # Evict least recently used
+                evicted = self._task_cache.pop(0)
+
         # Get current state
         state = await state_manager.get_state()
-        
+
         # Prepare context
         from ..core import settings
         full_context = {
@@ -131,7 +176,7 @@ class OrchestratorAgent:
             "generated_files": state.generated_files,
             "capabilities": [cap.model_dump() for cap in state.capabilities],
         }
-        
+
         if context:
             full_context.update(context)
 
@@ -142,6 +187,32 @@ class OrchestratorAgent:
             # Add research results to context
             full_context["research_results"] = research_results
 
+        # Detect if task is complex
+        if self._is_complex_prompt(task):
+            # Use PlannerAgent to decompose into phases
+            plan_result = await self.planner_agent.plan(task)
+            plan_output = plan_result.get("output", "")
+
+            # Parse plan output to extract phases (planner uses "Description: ..." format)
+            phases = re.findall(r"Description:\s*(.+)", plan_output)
+            if not phases:
+                # Fallback: try numbered list format "1. ..."
+                phases = re.findall(r"\d+\.\s*(.+)", plan_output)
+
+            aggregated_results = []
+            for phase in phases:
+                # Execute each phase sequentially, incrementing depth
+                phase_result = await self.run(phase, context=full_context, depth=depth+1)
+                aggregated_results.append({"phase": phase, "result": phase_result})
+
+            # Aggregate results into a summary
+            summary = "\n".join([f"Phase: {r['phase']}\nResult: {r['result'].get('output', '')}" for r in aggregated_results])
+
+            # Cache the aggregated summary
+            await state_manager.add_cached_result(task_hash, summary)
+
+            return {"output": summary, "phases_executed": len(phases)}
+
         # Create build step
         step_id = str(uuid.uuid4())
         step = BuildStep(
@@ -151,26 +222,28 @@ class OrchestratorAgent:
             status="running"
         )
         await state_manager.add_build_step(step)
-        
+
         try:
             # Run agent
             result = await self.agent_executor.ainvoke({
                 "input": task,
                 **full_context
             })
-            
+
+            output_str = str(result.get("output", ""))
+
             # Update step
             await state_manager.update_build_step(
                 step_id,
                 status="completed",
-                result=str(result.get("output", ""))
+                result=output_str
             )
-            
-            # After main run, invoke self-improver for syncing docs and improvements
-            await self_improver.improve("Sync documentation with new capabilities and improvements.")
-            
+
+            # Cache the result
+            await state_manager.add_cached_result(task_hash, output_str)
+
             return result
-        
+
         except Exception as e:
             # Update step with error
             await state_manager.update_build_step(

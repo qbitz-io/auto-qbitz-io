@@ -1,11 +1,13 @@
 """File Guardian - prevents Auto from modifying its own core files without human approval."""
 import asyncio
 import uuid
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
+APPROVALS_FILE = Path(__file__).parent / "approvals.json"
 
 # Core files that define Auto's identity and architecture.
 # Modifying these requires human approval.
@@ -22,10 +24,8 @@ PROTECTED_PATHS = [
     "backend/agents/builder.py",
     "backend/agents/validator.py",
     "backend/agents/toolsmith.py",
-    "backend/agents/self_improver.py",
     # Tools
     "backend/tools/base_tools.py",
-    "backend/tools/self_improver_tools.py",
     # API
     "backend/api.py",
     # Entry point
@@ -63,6 +63,27 @@ class PendingApproval(BaseModel):
     status: str = "pending"  # pending, approved, denied
     reviewed_at: Optional[datetime] = None
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "file_path": self.file_path,
+            "content": self.content,
+            "reason": self.reason,
+            "requested_at": self.requested_at.isoformat(),
+            "status": self.status,
+            "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        data = data.copy()
+        data["requested_at"] = datetime.fromisoformat(data["requested_at"])
+        if data.get("reviewed_at"):
+            data["reviewed_at"] = datetime.fromisoformat(data["reviewed_at"])
+        else:
+            data["reviewed_at"] = None
+        return cls(**data)
+
 
 class FileGuardian:
     """Guards protected files from unauthorized modification."""
@@ -70,6 +91,25 @@ class FileGuardian:
     def __init__(self):
         self._approvals: Dict[str, PendingApproval] = {}
         self._lock = asyncio.Lock()
+        self._load_approvals()
+
+    def _load_approvals(self):
+        if APPROVALS_FILE.exists():
+            try:
+                with open(APPROVALS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                for item in data:
+                    approval = PendingApproval.from_dict(item)
+                    self._approvals[approval.id] = approval
+            except Exception as e:
+                print(f"Failed to load approvals from {APPROVALS_FILE}: {e}")
+
+    def _save_approvals(self):
+        try:
+            with open(APPROVALS_FILE, "w", encoding="utf-8") as f:
+                json.dump([a.to_dict() for a in self._approvals.values()], f, indent=2)
+        except Exception as e:
+            print(f"Failed to save approvals to {APPROVALS_FILE}: {e}")
 
     def is_protected(self, file_path: str) -> bool:
         """Check if a file path is protected."""
@@ -96,6 +136,7 @@ class FileGuardian:
                 reason=reason,
             )
             self._approvals[approval.id] = approval
+            self._save_approvals()
             return approval
 
     async def get_pending(self) -> List[PendingApproval]:
@@ -120,6 +161,7 @@ class FileGuardian:
             if approval and approval.status == "pending":
                 approval.status = "approved"
                 approval.reviewed_at = datetime.now()
+                self._save_approvals()
                 return approval
             return None
 
@@ -130,6 +172,7 @@ class FileGuardian:
             if approval and approval.status == "pending":
                 approval.status = "denied"
                 approval.reviewed_at = datetime.now()
+                self._save_approvals()
                 return approval
             return None
 
@@ -139,6 +182,7 @@ class FileGuardian:
             resolved = [k for k, v in self._approvals.items() if v.status != "pending"]
             for k in resolved:
                 del self._approvals[k]
+            self._save_approvals()
             return len(resolved)
 
 
