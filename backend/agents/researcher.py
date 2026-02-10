@@ -21,6 +21,11 @@ class ResearchAgent:
     - React (https://react.dev)
     - Tailwind CSS (https://tailwindcss.com/docs)
     - FastAPI (https://fastapi.tiangolo.com)
+    - Python (https://docs.python.org/3/)
+    - Node.js (https://nodejs.org/en/docs/)
+    - React Native (https://reactnative.dev/docs/)
+    - GitHub API (https://docs.github.com/en/rest)
+    - Docker (https://docs.docker.com/)
     """
 
     DOC_SITES = {
@@ -29,6 +34,11 @@ class ResearchAgent:
         'react': 'https://react.dev',
         'tailwindcss': 'https://tailwindcss.com/docs',
         'fastapi': 'https://fastapi.tiangolo.com/en/latest/',
+        'python': 'https://docs.python.org/3/',
+        'nodejs': 'https://nodejs.org/en/docs/',
+        'reactnative': 'https://reactnative.dev/docs/',
+        'githubapi': 'https://docs.github.com/en/rest',
+        'docker': 'https://docs.docker.com/',
     }
 
     def __init__(self):

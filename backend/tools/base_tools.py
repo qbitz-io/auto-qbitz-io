@@ -48,6 +48,10 @@ async def write_file(file_path: str, content: str) -> str:
     Returns:
         Success or error message
     """
+    # Reject empty or None content
+    if content is None or content.strip() == "":
+        return f"ERROR: Cannot write empty content to {file_path}"
+
     # Normalize filename for reserved name check
     filename = Path(file_path).name.lower()
 

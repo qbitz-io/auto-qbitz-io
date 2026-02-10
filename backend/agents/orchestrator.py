@@ -245,6 +245,25 @@ class OrchestratorAgent:
             return result
 
         except Exception as e:
+            # Check if max iterations reached by inspecting exception message
+            if "max iterations" in str(e).lower() or "max_iteration" in str(e).lower():
+                # Save partial output if available
+                partial_output = getattr(self.agent_executor, "_last_output", None)
+                if partial_output is None:
+                    partial_output = "Max iterations reached with no partial output."
+
+                # Update step with partial output
+                await state_manager.update_build_step(
+                    step_id,
+                    status="partial",
+                    result=str(partial_output)
+                )
+
+                # Cache partial output
+                await state_manager.add_cached_result(task_hash, str(partial_output))
+
+                return {"output": partial_output, "partial": True, "error": str(e)}
+
             # Update step with error
             await state_manager.update_build_step(
                 step_id,
