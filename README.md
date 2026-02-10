@@ -10,7 +10,7 @@ A self-building AI system that autonomously plans, builds, validates, and improv
 ✅ Human-in-the-loop approvals  
 ✅ ResearchAgent for live documentation  
 
-> **🔒 Repository Status: LOCKED CORE v1.0.0**  
+> **🔒 Repository Status: LOCKED CORE v1.0.0**  
 > This is the stable foundation. **No PRs accepted.** Fork to extend.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -130,6 +130,16 @@ The ResearchAgent is a specialized agent that autonomously gathers information, 
 
 ---
 
+## Scoring Agent and Methodology
+
+Auto employs a sophisticated scoring system to evaluate generated code and guide decision-making. This system is implemented through the **ScoringAgent**:
+
+- **ScoringAgent:** Evaluates code quality based on correctness, style, and adherence to best practices.
+
+This scoring agent analyzes code changes during the build and validation phases, enabling Auto to prioritize high-quality code. The scoring approach ensures reliable and robust autonomous development.
+
+---
+
 ## Architecture Overview
 
 Auto's architecture consists of:
@@ -161,7 +171,7 @@ Auto's architecture consists of:
 
 ## Contributing
 
-## 🔒 Repository Status: LOCKED CORE
+## 🔒 Repository Status: LOCKED CORE
 
 **Version:** 1.0.0 (Stable Foundation)
 
