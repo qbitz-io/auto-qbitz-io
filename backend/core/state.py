@@ -14,7 +14,7 @@ class BuildStep(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
     agent: str
     action: str
-    status: str  # pending, running, completed, failed
+    status: str  # pending, running, completed, failed, interrupted, partial
     result: Optional[str] = None
     error: Optional[str] = None
 
@@ -191,7 +191,7 @@ class StateManager:
             if age_seconds < 3600:  # 1 hour TTL
                 return entry["result"]
             else:
-                # Expired — clean it up
+                # Expired  clean it up
                 del cache[task_hash]
                 state.metadata["task_cache"] = cache
                 await self.save()
@@ -207,6 +207,11 @@ class StateManager:
         }
         state.metadata["task_cache"] = cache
         await self.save()
+
+    async def get_build_steps_by_status(self, status: str) -> List[BuildStep]:
+        """Retrieve all build steps with the given status."""
+        state = await self.get_state()
+        return [step for step in state.build_steps if step.status == status]
 
 
 # Global state manager instance

@@ -28,25 +28,16 @@ Tool design principles:
 - Error handling
 
 Example tool structure:
-```python
 from langchain_core.tools import tool
 
 @tool
 async def my_new_tool(param: str) -> str:
-    \"\"\"Brief description of what the tool does.
-    
-    Args:
-        param: Description of parameter
-    
-    Returns:
-        Description of return value
-    \"\"\"
+    'Brief description of what the tool does.'
     try:
         # Implementation
         return result
     except Exception as e:
-        return f"Error: {{str(e)}}"
-```
+        return f'Error: str(e)'
 
 Save new tools to: backend/tools/custom_tools.py
 Update backend/tools/__init__.py to export them

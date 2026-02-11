@@ -67,7 +67,8 @@ class OrchestratorAgent:
         self._initialize_agent()
         self._task_cache_limit = 100
         self._task_cache = []  # LRU cache of task hashes
-    
+        self.mode = "working"  # Modes: 'working', 'build'
+
     def _initialize_agent(self):
         """Initialize the LangChain agent with tools."""
         prompt = ChatPromptTemplate.from_messages([
@@ -85,6 +86,30 @@ class OrchestratorAgent:
             max_iterations=20,
             handle_parsing_errors=True
         )
+
+    def set_mode(self, mode: str) -> None:
+        """Set the mode of the orchestrator."""
+        if mode not in ("working", "build"):
+            raise ValueError(f"Invalid mode: {mode}")
+        self.mode = mode
+
+    async def resume_interrupted_steps(self) -> None:
+        """Resume any interrupted build steps from previous runs."""
+        interrupted_steps = await state_manager.get_build_steps_by_status("interrupted")
+        if not interrupted_steps:
+            return
+        print(f"Resuming {len(interrupted_steps)} interrupted build step(s)...")
+        self.set_mode("build")
+        for step in interrupted_steps:
+            print(f"Resuming build step {step.id} action: {step.action}")
+            try:
+                await self.run(step.action)
+                # Mark step as completed after successful run
+                await state_manager.update_build_step(step.id, status="completed")
+            except Exception as e:
+                print(f"Error resuming build step {step.id}: {e}")
+                await state_manager.update_build_step(step.id, status="failed", error=str(e))
+        self.set_mode("working")
 
     def _detect_unfamiliar_apis(self, text: str) -> List[str]:
         """Detect unfamiliar APIs or libraries mentioned in the text.
@@ -213,6 +238,9 @@ class OrchestratorAgent:
 
             return {"output": summary, "phases_executed": len(phases)}
 
+        # Set mode to build when running a build task
+        self.set_mode("build")
+
         # Create build step
         step_id = str(uuid.uuid4())
         step = BuildStep(
@@ -242,6 +270,9 @@ class OrchestratorAgent:
             # Cache the result
             await state_manager.add_cached_result(task_hash, output_str)
 
+            # Set mode back to working after build
+            self.set_mode("working")
+
             return result
 
         except Exception as e:
@@ -262,6 +293,9 @@ class OrchestratorAgent:
                 # Cache partial output
                 await state_manager.add_cached_result(task_hash, str(partial_output))
 
+                # Set mode back to working after partial build
+                self.set_mode("working")
+
                 return {"output": partial_output, "partial": True, "error": str(e)}
 
             # Update step with error
@@ -270,6 +304,8 @@ class OrchestratorAgent:
                 status="failed",
                 error=str(e)
             )
+            # Set mode back to working after failure
+            self.set_mode("working")
             raise
 
     async def analyze_system(self) -> Dict[str, Any]:

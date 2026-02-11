@@ -36,3 +36,7 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+# Configuration for integration with qbitz-backend
+INTEGRATION_MODE = True
+QBITZ_BACKEND_PATH = '../qbitz-backend'
