@@ -1,14 +1,16 @@
-# Auto v1.0.3 - Stable
+# Auto v1.0.4 - Stable
 
 ## What is Auto?
 A self-building AI system that autonomously plans, builds, validates, and improves software through conversational interaction.
 
 ## Core Features
-✅ Self-building agent pipeline  
-✅ Chat-based interface  
-✅ FileGuardian protection system  
-✅ Human-in-the-loop approvals  
-✅ ResearchAgent for live documentation  
+✅ Self-building agent pipeline
+✅ Chat-based interface with session persistence
+✅ FileGuardian protection system
+✅ Human-in-the-loop approvals
+✅ ResearchAgent for live documentation
+✅ Process supervisor with auto-restart
+✅ Chat memory across page refreshes
 
 > **🔒 Repository Status: LOCKED CORE v1.0.0**  
 > This is the stable foundation. **No PRs accepted.** Fork to extend.
@@ -68,7 +70,8 @@ Before setting up Auto, ensure you have the following installed:
 
 5. Run the backend server:
    ```bash
-   uvicorn api:app --reload
+   # New entry point: use the supervisor to automatically restart the API server if it crashes
+   python backend/supervisor.py
    ```
 
 ### Frontend Setup
@@ -208,3 +211,28 @@ By open-sourcing this core, we invite the community to collaborate, specialize, 
 ---
 
 Thank you for exploring Auto. We look forward to seeing what you build with it!
+
+---
+
+## Changelog
+
+### v1.0.4 - 2026-02-11
+
+**Process Supervisor**
+- Added `backend/supervisor.py` — monitors the API server and auto-restarts on crash with a 3-second delay
+- Run via `python backend/supervisor.py` as the recommended backend entry point
+- `main.py` remains the self-build loop entry point (unchanged)
+
+**Chat Context Persistence**
+- Added `backend/memory/chat_memory.py` — session-based chat history storage to JSON
+- Added chat API endpoints: `GET /api/chat/{session_id}`, `POST /api/chat/{session_id}/clear`
+- Updated `ChatInterface.tsx` — session IDs via localStorage, history reloads on page refresh, "New Session" button
+- Chat history is sent as context with each task request so the orchestrator sees prior conversation
+
+**State Recovery**
+- Restored `backend/core/state.py` after a destructive rewrite was accidentally approved — full StateManager with async persistence, build step tracking, crash recovery, and task caching preserved
+
+### v1.0.3
+
+- Experiment-03 fixes: max iterations handling, code review gate, expanded research, empty content guard
+- Scoring consolidation, file type routing, pre-write validation, approval persistence

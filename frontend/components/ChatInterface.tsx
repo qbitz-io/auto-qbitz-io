@@ -8,17 +8,57 @@ interface Message {
   text: string;
 }
 
-export function ChatInterface() {
+function generateSessionId() {
+  return `session-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+export function ChatInterface({ initialSessionId }: { initialSessionId?: string }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string>(initialSessionId || "");
 
   // Scroll chat to bottom on new message
   const chatEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Load or create session ID and load message history on mount
+  useEffect(() => {
+    let storedSessionId = initialSessionId || localStorage.getItem("chatSessionId");
+    if (!storedSessionId) {
+      storedSessionId = generateSessionId();
+      localStorage.setItem("chatSessionId", storedSessionId);
+    }
+    setSessionId(storedSessionId);
+
+    // Load message history from backend
+    async function loadHistory() {
+      try {
+        const response = await fetch(`http://localhost:8000/api/chat/${storedSessionId}`, {
+          method: "GET",
+          mode: "cors",
+        });
+        if (response.ok) {
+          const data = await response.json();
+          // Expecting data.history as array of {role, content}
+          if (Array.isArray(data.history)) {
+            const loadedMessages = data.history.map((msg: any, idx: number) => ({
+              id: `msg-${idx}`,
+              sender: msg.role === "user" ? "user" : "system",
+              text: msg.content,
+            }));
+            setMessages(loadedMessages);
+          }
+        }
+      } catch (err) {
+        // Ignore load errors
+      }
+    }
+    loadHistory();
+  }, [initialSessionId]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -36,13 +76,18 @@ export function ChatInterface() {
     setInput("");
 
     try {
-      // Send POST request with JSON body {task: message, context: {}}
+      // Prepare chat history for context
+      const chatHistory = messages
+        .concat(userMessage)
+        .map((msg) => ({ role: msg.sender, content: msg.text }));
+
+      // Send POST request with JSON body {task: message, context: {chat_history}, session_id}
       const response = await fetch("http://localhost:8000/api/task", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ task: userMessage.text, context: {} }),
+        body: JSON.stringify({ task: userMessage.text, context: { chat_history: chatHistory }, session_id: sessionId }),
         mode: "cors",
       });
 
@@ -73,6 +118,27 @@ export function ChatInterface() {
       if (!isSending) {
         handleSend();
       }
+    }
+  };
+
+  const handleNewSession = async () => {
+    const newSessionId = generateSessionId();
+    setSessionId(newSessionId);
+    localStorage.setItem("chatSessionId", newSessionId);
+    setMessages([]);
+    setError(null);
+
+    // Clear backend chat history for new session
+    try {
+      const response = await fetch(`http://localhost:8000/api/chat/${newSessionId}/clear`, {
+        method: "POST",
+        mode: "cors",
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to clear chat history: ${response.statusText}`);
+      }
+    } catch (err) {
+      // Ignore clear errors
     }
   };
 
@@ -113,14 +179,26 @@ export function ChatInterface() {
         aria-label="Build task input"
       />
 
-      <button
-        onClick={handleSend}
-        disabled={isSending || !input.trim()}
-        className={`mt-2 px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold`}
-        aria-label="Send build task"
-      >
-        {isSending ? "Building..." : "Send"}
-      </button>
+      <div className="flex justify-between mt-2">
+        <button
+          onClick={handleSend}
+          disabled={isSending || !input.trim()}
+          className={`px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold`}
+          aria-label="Send build task"
+        >
+          {isSending ? "Building..." : "Send"}
+        </button>
+
+        <button
+          onClick={handleNewSession}
+          disabled={isSending}
+          className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-semibold"
+          aria-label="Start new session"
+          title="Start a new chat session and clear history"
+        >
+          New Session
+        </button>
+      </div>
     </div>
   );
 }

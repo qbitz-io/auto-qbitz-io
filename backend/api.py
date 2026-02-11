@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from backend.core import state_manager, build_loop, settings
 from backend.core.file_guardian import file_guardian
 from backend.agents import orchestrator
+from backend.memory.chat_memory import ChatMemory
 
 
 # Create FastAPI app
@@ -70,6 +71,7 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+chat_memory = ChatMemory()
 
 # Routes
 @app.get("/")
@@ -250,6 +252,29 @@ async def list_protected_files():
     return {
         "protected": PROTECTED_PATHS,
         "forbidden": FORBIDDEN_PATHS,
+    }
+
+
+# Chat session endpoints
+@app.get("/api/chat/{session_id}")
+async def get_chat_history(session_id: str):
+    """Get chat history for a session."""
+    history = chat_memory.get_history(session_id)
+    return {
+        "session_id": session_id,
+        "history": history,
+        "count": len(history),
+    }
+
+
+@app.post("/api/chat/{session_id}/clear")
+async def clear_chat_history(session_id: str):
+    """Clear chat history for a session."""
+    chat_memory.clear_history(session_id)
+    return {
+        "session_id": session_id,
+        "status": "cleared",
+        "message": f"Chat history for session {session_id} has been cleared.",
     }
 
 
