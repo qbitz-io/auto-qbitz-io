@@ -157,7 +157,7 @@ class OrchestratorAgent:
             return True
         return False
 
-    async def run(self, task: str, context: Optional[Dict[str, Any]] = None, depth: int = 0) -> Dict[str, Any]:
+    async def run(self, task: str, context: Optional[Dict[str, Any]] = None, depth: int = 0, _is_phase: bool = False) -> Dict[str, Any]:
         """Run the orchestrator with a specific task.
 
         Args:
@@ -213,7 +213,7 @@ class OrchestratorAgent:
             full_context["research_results"] = research_results
 
         # Detect if task is complex
-        if self._is_complex_prompt(task):
+        if not _is_phase and self._is_complex_prompt(task):
             # Use PlannerAgent to decompose into phases
             plan_result = await self.planner_agent.plan(task)
             plan_output = plan_result.get("output", "")
@@ -226,8 +226,14 @@ class OrchestratorAgent:
 
             aggregated_results = []
             for phase in phases:
-                # Execute each phase sequentially, incrementing depth
-                phase_result = await self.run(phase, context=full_context, depth=depth+1)
+                # Pass previous phase results as context so phases can build on each other
+                phase_context = {**full_context}
+                if aggregated_results:
+                    phase_context["previous_phases"] = [
+                        {"phase": r["phase"], "result": r["result"].get("output", "")}
+                        for r in aggregated_results
+                    ]
+                phase_result = await self.run(phase, context=phase_context, depth=depth+1, _is_phase=True)
                 aggregated_results.append({"phase": phase, "result": phase_result})
 
             # Aggregate results into a summary
