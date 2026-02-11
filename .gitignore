@@ -45,6 +45,10 @@ htmlcov/
 *.pyc
 .cache/
 
+# Runtime data
+backend/cache/
+backend/memory/
+
 # Claude Code
 CLAUDE.md
 .claude/
